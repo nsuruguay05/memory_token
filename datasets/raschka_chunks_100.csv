@@ -1,0 +1,525 @@
+chunk
+"The development of large language models (LLMs) has come a long way, from the early GPT models to th"
+"e sophisticated open-weight LLMs we have today. Initially, the LLM training process focused solely o"
+"n pre-training, but it has since expanded to include both pre-training and post-training. Post-train"
+"ing typically encompasses supervised instruction fine-tuning and alignment, which was popularized by"
+" ChatGPT.
+
+Training methodologies have evolved since ChatGPT was first released. In this article, I "
+"review the latest advancements in both pre-training and post-training methodologies, particularly th"
+"ose made in recent months.
+
+An overview of the LLM development and training pipeline, with a focus o"
+"n new pre-training and post-training methodologies discussed in this article
+There are hundreds of L"
+"LM papers each month proposing new techniques and approaches. However, one of the best ways to see w"
+hat actually works well in practice is to look at the pre-training and post-training pipelines of th
+"e most recent state-of-the-art models. Luckily, four major new LLMs have been released in the last m"
+"onths, accompanied by relatively detailed technical reports.
+
+In this article, I focus on the pre-tr"
+"aining and post-training pipelines of the following models:
+
+Alibaba’s Qwen 2
+Apple Intelligence Fou"
+"ndation Language Models
+Google’s Gemma 2
+Meta AI’s Llama 3.1
+These models are presented in order bas"
+"ed on the publication dates of their respective technical papers on arXiv.org, which also happens to"
+" align with their alphabetical order.
+
+1. Alibaba’s Qwen 2
+Let’s begin with Qwen 2, a really strong "
+"LLM model family that is competitive with other major LLMs. However, for some reason, it’s less popu"
+"lar than the open-weight models from Meta AI, Microsoft, and Google.
+
+1.1 Qwen 2 Overview 
+Before lo"
+"oking at the pre-training and post-training methods discussed in the Qwen 2 Technical Report, let’s "
+"briefly summarize some core specifications.
+
+Qwen 2 models come in 5 flavors. There are 4 regular (d"
+"ense) LLMs with sizes 0.5 billion, 1.5 billion, 7 billion, and 72 billion parameters. In addition, t"
+"here is a Mixture-of-Experts model with 57 billion parameters, where 14 billion parameters are activ"
+"ated at the same time. (Since architecture details are not the focus this time, I won’t go too much "
+"into the Mixture-of-Experts model; however, in a nutshell, this is similar to Mixtral by Mistral AI,"
+" except that it has more active experts. For a high-level overview, see the Mixtral Architecture sec"
+"tion in my Model Merging, Mixtures of Experts, and Towards Smaller LLMs article.)
+
+One of the stand-"
+out features of Qwen 2 LLMs are their good multilingual capabilities in 30 languages. They also have
+" a surprisingly large 151,642 token vocabulary (for reference, Llama 2 uses a 32k vocabulary, and Ll"
+"ama 3.1 uses a 128k token vocabulary); as a rule of thumb, increasing the vocab size by 2x reduces t"
+he number of input tokens by 2x so the LLM can fit more tokens into the same input. Also it especial
+"ly helps with multilingual data and coding to cover words outside the standard English vocabulary.
+
+"
+Below is a brief MMLU benchmark comparison with other LLMs covered later. (Note that MMLU is a multi
+"ple-choice benchmark and thus has its limitations; however, it still is one of the most popular meth"
+"ods for reporting LLM performance.)
+
+MMLU benchmark scores for the latest open-weight models (higher"
+ values are better). I collected the scores for this plot from the official research papers of each 
+"model.
+(If you are new to MMLU, I briefly discussed it in my recent talk at minute 46:05.)
+
+1.2 Qwen"
+" 2 Pre-training 
+The Qwen 2 team trained the 1.5 billion, 7 billion, and 72 billion parameter models"
+" on 7 trillion training tokens, which is a reasonable size. For comparison, Llama 2 models were trai"
+"ned on 2 trillion tokens, and Llama 3.1 models were trained on 15 trillion tokens.
+
+Interestingly, t"
+"he 0.5 billion parameter model was trained on 12 trillion tokens. However, the researchers did not t"
+rain the other models on the larger 12 trillion token dataset because they did not observe any impro
+"vements during training, and the additional computational costs were not justified.
+
+One of the focu"
+s areas has been improving the data filtering pipeline to remove low-quality data and enhancing data
+" mixing to increase data diversity— a theme we will revisit when examining other models later.
+
+Inte"
+"restingly, they also used Qwen models (although they didn’t specify details, I assume they mean prev"
+ious generation Qwen models) to synthesize additional pre-training data. And the pre-training involv
+ed “multi-task instruction data… to enhance in-context learning and instruction-following abilities.
+"”
+
+Furthermore, they performed training in two stages: regular pre-training followed by long-context"
+" training. The latter increased the context length from 4,096 to 32,768 tokens at the end phase of p"
+"re-training using “high-quality, lengthy data.”
+
+Summary of techniques for Qwen 2 pre-training. ""Con"
+"tinued pre-training"" refers to the 2-stage pre-training, where the researchers started with regular "
+"pre-training and followed up with a long-context continued pre-training.
+(Unfortunately, another the"
+"me of the technical reports is that details about the dataset are scarce, so if my write-up does not"
+" appear very detailed, it’s due to the lack of publicly available information.)
+
+1.3 Qwen 2 Post-tra"
+"ining 
+The Qwen 2 team employed the popular two-phase post-training methodology, starting with super"
+"vised instruction fine-tuning (SFT), which was applied across 500,000 examples for 2 epochs. This ph"
+"ase aimed to refine the model’s response accuracy in predetermined scenarios.
+
+A typical LLM develop"
+"ment flow.
+After SFT, they used direct preference optimization (DPO) to align the LLM with human pre"
+ferences. (Interestingly referred to in their terminology as reinforcement learning from human feedb
+"ack, RLHF.) As I discussed in my Tips for LLM Pretraining and Evaluating Reward Models article a few"
+" weeks ago, the SFT+DPO approach seems to be the most popular preference tuning strategy at the mome"
+"nt due to the ease of use compared to other methods, such as RLHF with PPO. (If you want to learn ho"
+"w DPO works, I recently implemented it from scratch here.)
+
+The alignment phase itself was also done"
+" in 2 stages. First using DPO on an existing dataset (offline stage). Second, using a reward model t"
+"o form the preference pair (online). Here, the model generates multiple responses during training, a"
+"nd a reward model selects the preferred response for the optimization step in “real-time” (that is, "
+"during training). This is also often referred to as “rejection sampling.”
+
+For the construction of t"
+"he dataset, they used existing corpora complemented by human labeling to determine target responses "
+for SFT and identify preferred and rejected responses essential for DPO. The researchers also synthe
+"sized artificially annotated data.
+
+Moreover, the team used LLMs to generate instruction-response pa"
+"irs specifically tailored for “high-quality literary data,” to create high-quality Q&A pairs for tra"
+"ining.
+
+Summary of techniques for Qwen 2 post-training.
+1.4 Conclusion 
+Qwen 2 is a relatively capab"
+"le model, and similar to earlier generations of Qwen. When attending the NeurIPS LLM efficiency chal"
+"lenge in December 2023, I remember that most of the winning approaches involved a Qwen model.
+
+Regar"
+"ding the training pipeline of Qwen 2, what stands out is that synthetic data has been used for both "
+"pre-training and post-training. Also, the focus on dataset filtering (rather than collecting as much"
+" data as possible) is one of the notable trends in LLM training. Here, I would say, more is better, "
+"but only if it meets certain quality standards.
+
+Aligning LLMs with Direct Preference Optimization f"
+"rom Scratch
+Direct Preference Optimization (DPO) has become one of the go-to methods to align LLMs m"
+"ore closely with user preferences, and it’s something you will read a lot in this article. If you wa"
+"nt to learn how it works, I coded it from scratch here: Direct Preference Optimization (DPO) for LLM"
+" Alignment (From Scratch).
+
+An overview of DPO for LLM alignment
+2. Apple’s Apple Intelligence Found"
+"ation Language Models (AFM)
+I was really delighted to see another technical paper by Apple on arXiv."
+"org that outlines their model training. An unexpected but definitely positive surprise!
+
+2.1 AFM Ove"
+"rview 
+In the Apple Intelligence Foundation Language Models paper, available at, the research team o"
+utlines the development of two primary models designed for use in the “Apple Intelligence” context o
+"n Apple devices. For brevity, these models will be abbreviated as AFM for “Apple Foundation Models” "
+"throughout this section.
+
+Specifically, the paper describes two versions of the AFM: a 3-billion-par"
+"ameter on-device model intended for deployment on phones, tablets, or laptops, and a more capable se"
+"rver model of unspecified size.
+
+These models are developed for chat, math, and coding tasks, althou"
+"gh the paper does not discuss any of the coding-specific training and capabilities.
+
+Like the Qwen 2"
+", the AFMs are dense LLMs and do not utilize a mixture-of-experts approach.
+
+2.2 AFM Pre-training 
+I"
+"’d like to extend two big kudos to the researchers. First, besides using publicly available data and"
+" data licensed by publishers, they respected the robots.txt files on websites and refrained from cra"
+"wling these. Second, they also mentioned that they performed decontamination with benchmark data.
+
+T"
+"o reinforce one of the takeaways of the Qwen 2 paper, the researchers mentioned that quality was muc"
+h more important than quantity. (With a vocabulary size of 49k tokens for the device model and 100k 
+"tokens for the server model, the vocabulary sizes were noticeably smaller than those of the Qwen 2 m"
+"odels, which used 150k token vocabulary.)
+
+Interestingly, the pre-training was not done in 2 but 3 s"
+"tages!
+
+Core (regular) pre-training
+Continued pre-training where web-crawl (lower-quality) data was "
+"down-weighted; math and code was up-weighted
+Context-lengthening with longer sequence data and synth"
+"etic data
+
+Overview of the 3-step pre-training process that the AFM models underwent.
+Let’s take a l"
+"ook at these 3 steps in a bit more detail.
+
+2.2.1 Pre-training I: Core Pre-training 
+Core pre-traini"
+ng describes the first pre-training stage in Apple’s pre-training pipeline. This is akin to regular 
+"pre-training, where the AFM-server model was trained on 6.3 trillion tokens, a batch size of 4096 ba"
+"tch size and a 4096-token sequence length. This is very similar to Qwen 2 models, which were trained"
+" in 7 trillion tokens.
+
+However, it gets more interesting for the AFM-on-device model, which is dist"
+illed and pruned from a larger 6.4-billion-parameter model (trained from scratch like the AFM-server
+" model described in the previous paragraph.
+
+There’s not much detail on the distillation process bes"
+ides “a distillation loss is used by replacing the target labels with a convex combination of the tr
+ue labels and the teacher model’s top-1 predictions (with 0.9 weight assigned to the teacher labels)
+".”
+
+I feel that knowledge distillation is becoming increasingly prevalent and useful for LLM pre-tra"
+"ining (Gemma-2 uses it, too). I plan to cover it in more detail one day. For now, here’s a brief ove"
+"rview of how this process would work on a high level.
+
+An overview of knowledge distillation, where "
+"a small model (here, the AFM-device 3B model) is trained on the original training tokens plus the ou"
+"tputs from a larger teacher model (here, a 6.4B model). Note that the cross entropy loss in a) is th"
+e regular training loss used for pre-training LLMs (see chapter 5 in my Build a Large Language Model
+" from Scratch"" book for more details on how the regular pre-training step is implemented).
+Knowledge"
+" distillation, as illustrated above, still involves training on the original dataset. However, in ad"
+"dition to the training tokens in the dataset, the model to be trained (referred to as the student) r"
+"eceives information from the larger (teacher) model, which provides a richer signal compared to trai"
+ning without knowledge distillation. The downside is that you must: 1) train the larger teacher mode
+"l first, and 2) compute predictions on all training tokens using the larger teacher model. These pre"
+dictions can be computed ahead of time (which requires substantial storage space) or during training
+" (which may slow down the training process).
+
+2.2.2 Pre-training II: Continued Pre-training 
+The con"
+"tinued pre-training stage includes a small context lengthening step from 4,096 to 8,192 tokens on a "
+dataset consisting of 1 trillion tokens (the core pre-training set was five times larger). The prima
+"ry focus, however, is on training with a high-quality data mix, with an emphasis on math and code.
+
+"
+"Interestingly, the researchers found that the distillation loss was not beneficial in this context.
+"
+"
+2.2.3 Pre-training III: Context Lengthening 
+The third pre-training stage involves only 100 billion"
+ tokens (10% of the tokens used in the second stage) but represents a more significant context lengt
+"hening to 32,768 tokens. To achieve this, the researchers augmented the dataset with synthetic long-"
+"context Q&A data.
+
+Summary of techniques for AFM pre-training.
+2.3 AFM Post-training 
+Apple appears "
+to have taken a similarly comprehensive approach to their post-training process as they did with pre
+"-training. They leveraged both human-annotated and synthetic data, emphasizing that data quality was"
+" prioritized over quantity. Interestingly, they did not rely on predetermined data ratios; instead, "
+"they fine-tuned the data mixture through multiple experiments to achieve the optimal balance.
+
+The p"
+ost-training phase involved a two-step process: supervised instruction fine-tuning followed by sever
+"al rounds of reinforcement learning with human feedback (RLHF).
+
+A particularly noteworthy aspect of"
+" this process is Apple’s introduction of two new algorithms for the RLHF stage:
+
+Rejection Sampling "
+"Fine-tuning with Teacher Committee (iTeC)
+RLHF with Mirror Descent Policy Optimization
+Given the len"
+"gth of this article, I won’t go into the technical details of these methods, but here’s a brief over"
+"view:
+
+The iTeC algorithm combines rejection sampling with multiple preference tuning techniques—spe"
+"cifically, SFT, DPO, IPO, and online RL. Rather than relying on a single algorithm, Apple trained mo"
+"dels using each approach independently. These models then generated responses, which were evaluated "
+by humans who provided preference labels. This preference data was used to iteratively train a rewar
+"d model in an RLHF framework. During the rejection sampling phase, a committee of models generated m"
+"ultiple responses, with the reward model selecting the best one.
+
+This committee-based approach is q"
+"uite complex but should be relatively feasible, particularly given the relatively small size of the "
+models involved (around 3 billion parameters). Implementing such a committee with much larger models
+", like the 70B or 405B parameter models in Llama 3.1, would definitely be more challenging.
+
+As for "
+"the second algorithm, RLHF with Mirror Descent, it was chosen because it proved more effective than "
+"the commonly used PPO (Proximal Policy Optimization).
+
+Summary of techniques for AFM post-training.
+"
+"2.4 Conclusion 
+Apple’s approach to pre-training and post-training is relatively comprehensive, like"
+"ly because the stakes are very high (the model is deployed on millions, if not billions, of devices)"
+". However, given the small nature of these models, a vast array of techniques also becomes feasible,"
+" since a 3B model is less than half the size of the smallest Llama 3.1 model.
+
+One of the highlights"
+" is that it’s not a simple choice between RLHF and DPO; instead, they used multiple preference-tunin"
+"g algorithms in the form of a committee.
+
+It’s also interesting that they explicitly used Q&A data a"
+"s part of the pre-training—something I discussed in my previous article, Instruction Pretraining LLM"
+"s.
+
+All in all, it’s a refreshing and delightful technical report.
+
+3. Google’s Gemma 2
+Google’s Gem"
+"ma models were recently described in Gemma 2: Improving Open Language Models at a Practical Size.
+
+I"
+’ll provide an overview of some of key facts in the following overview section before discussing the
+" pre-training and post-training processes.
+
+3.1 Gemma 2 Overview 
+The Gemma 2 models are available i"
+"n three sizes: 2 billion, 9 billion, and 27 billion parameters. The primary focus is on exploring te"
+chniques that do not necessarily require increasing the size of training datasets but rather on deve
+"loping relatively small and efficient LLMs.
+
+Notably, Gemma 2 features a substantial vocabulary size"
+" of 256k tokens. For comparison, Llama 2 uses a 32k token vocabulary, and Llama 3 has a 128k token v"
+"ocabulary.
+
+Additionally, Gemma 2 employs sliding window attention, similar to Mistral’s early model"
+"s, likely to reduce memory costs. For more details on the Gemma 2 architecture, please refer to the "
+"Gemma 2 section in my previous article.
+
+3.2 Gemma 2 Pre-training 
+The Gemma researchers argue that "
+"even small models are often undertrained. However, rather than simply increasing the size of the tra"
+"ining dataset, they focus on maintaining quality and achieve improvements through alternative method"
+"s, such as knowledge distillation, similar to Apple’s approach.
+
+While the 27B Gemma 2 model was tra"
+"ined from scratch, the smaller models were trained using knowledge distillation similar to Apple’s a"
+"pproach explained previously.
+
+The 27B model was trained on 13 trillion tokens, the 9B model on 8 tr"
+"illion tokens, and the 2B model on 2 trillion tokens. Additionally, similar to Apple’s approach, the"
+" Gemma team optimized the data mixture to improve performance.
+
+Summary of techniques for Gemma 2 pr"
+"e-training.
+3.3 Gemma 2 Post-training 
+The post-training process for the Gemma models involved the t"
+"ypical supervised fine-tuning (SFT) and reinforcement learning with human feedback (RLHF) steps.
+
+Th"
+"e instruction data involved using English-only prompt pairs, which were a mix of human-generated and"
+" synthetic-generated content. Specifically, and interestingly, the responses were primarily generate"
+"d by teacher models, and knowledge distillation was also applied during the SFT phase.
+
+An interesti"
+"ng aspect of their RLHF approach, following SFT, is that the reward model used for RLHF is ten times"
+" larger than the policy (target) model.
+
+The RLHF algorithm employed by Gemma is fairly standard, bu"
+"t with a unique twist: they average the policy models through a method called WARP, a successor to W"
+ARM (weight-averaged reward models). I previously discussed this method in detail in my article “Mod
+"el Merging, Mixtures of Experts, and Towards Smaller LLMs”.
+
+Summary of techniques for Gemma 2 post-"
+"training.
+3.4 Conclusion 
+The Gemma team seems to really double down on knowledge distillation, whic"
+"h they use during both pre-training and post-training similar to Apple. Interestingly, they didn’t u"
+"se a multi-stage pre-training approach though, or at least, they didn’t detail it in their paper.
+
+I"
+ am excited to be invited to give a keynote talk at the upcoming PyTorch conference. It will be my f
+"irst PyTorch conference, and I look forward to meeting the community and chatting about the latest A"
+"I and LLM developments!
+4. Meta AI’s Llama 3.1
+New releases of Meta’s Llama LLMs are always a big th"
+"ing. This time, the release was accompanied by a 92-page technical report: The Llama 3 Herd of Model"
+"s. Last but not least, in this section, we will look at the fourth big model paper released last mon"
+"th.
+
+4.1 Llama 3.1 Overview 
+Along with releasing a huge 405 billion parameter model, Meta updated t"
+"heir previous 8 billion and 70 billion parameter models, giving them a slight MMLU performance boost"
+".
+
+MMLU benchmark performance of different models.
+While Llama 3 uses group query attention like oth"
+"er recent LLMs, surprisingly, Meta AI said no to sliding window attention and Mixture-of-Experts app"
+"roaches. In other words, the Llama 3.1 looks very traditional, and the focus was clearly on the pre-"
+"training and post-training rather than architecture innovations.
+
+Similar to previous Llama releases"
+", the weights are openly available. Moreover, Meta said that they updated the Llama 3 license so tha"
+t it’s now finally possible (allowed) to use Llama 3 for synthetic data generation or knowledge dist
+"illation to improve other models.
+
+4.2 Llama 3.1 Pre-training 
+Llama 3 was trained on a massive 15.6"
+" trillion tokens dataset, which is a substantial increase from Llama 2’s 1.8 trillion tokens. The re"
+"searchers say that it supports at least eight languages, (whereas Qwen 2 is capable of handling 20)."
+"
+
+An interesting aspect of Llama 3 is its vocabulary size of 128,000, which was developed using Open"
+"AI’s tiktoken tokenizer. (For those interested in tokenizer performance, I did a simple benchmark co"
+"mparison here.)
+
+In terms of pre-training data quality control, Llama 3 employs heuristic-based filt"
+"ering alongside model-based quality filtering, utilizing fast classifiers like Meta AI’s fastText an"
+d RoBERTa-based classifiers. These classifiers also help in determining the context categories for t
+"he data mix used during training.
+
+The pre-training for Llama 3 is divided into three stages. The fi"
+rst stage involves standard initial pre-training using the 15.6 trillion tokens with an 8k context w
+indow. The second stage continues with the pre-training but extends the context length to 128k. The 
+"final stage involves annealing, which further enhances the model’s performance. Let’s look into thes"
+"e stages in more detail below.
+
+4.2.1 Pre-training I: Standard (Initial) Pre-training 
+In their trai"
+"ning setup, they began with batches consisting of 4 million tokens, each with a sequence length of 4"
+"096. This implies a batch size of approximately 1024 tokens, assuming that the 4 million figure is r"
+"ounded to the nearest digit. After processing the first 252 million tokens, they doubled the sequenc"
+"e length to 8192. Further into the training process, after 2.87 trillion tokens, they doubled the ba"
+"tch size again.
+
+Additionally, the researchers did not keep the data mix constant throughout the tra"
+"ining. Instead, they adjusted the mix of data being used during the training process to optimize mod"
+el learning and performance. This dynamic approach to data handling likely helped in improving the m
+"odel’s ability to generalize across different types of data.
+
+4.2.2 Pre-training II: Continued Pre-t"
+"raining for Context Lengthening 
+Compared to other models that increased their context window in a s"
+"ingle step, the Llama 3.1 context lengthening was a more gradual approach: Here, the researchers inc"
+"reased the context length through six distinct stages from 8,000 to 128,000 tokens. This stepwise in"
+"crement likelely allowed the model to adapt more smoothly to larger contexts.
+
+The training set util"
+"ized for this process was involved 800 billion tokens, about 5% of the total dataset size.
+
+4.2.3 Pr"
+"e-training III: Annealing on High-quality Data 
+For the third pre-training stage, the researchers tr"
+"ained the model on a small but high-quality mix, which they found helps improve the performance on b"
+"enchmark datasets. For example, annealing on the GSM8K and MATH training sets provided a significant"
+" boost on the respective GSM8K and MATH validation sets.
+
+In section 3.1.3 of the paper, the researc"
+hers stated that the annealing dataset size was 40 billion tokens (0.02% of the total dataset size);
+" this 40B annealing dataset was used to assess data quality. In section 3.4.3, they state that the a"
+"ctual annealing was done only on 40 million tokens (0.1% of the annealing data).
+
+Summary of techniq"
+"ues for Llama 3.1 pre-training.
+4.3 Llama 3.1 Post-training 
+For their post-training process, the Me"
+"ta AI team employed a relatively straightforward method that included supervised fine-tuning (SFT), "
+"rejection sampling, and direct preference optimization (DPO).
+
+They observed that reinforcement lear"
+ning algorithms like RLHF with PPO were less stable and more challenging to scale compared to these 
+techniques. It’s worth noting that the SFT and DPO steps were iteratively repeated over multiple rou
+"nds, incorporating both human-generated and synthetic data.
+
+Before describing the further details, "
+"their workflow is illustrated in the figure below.
+
+Annotated figure from the Llama 3.1 paper descri"
+"bing the post-training procedure
+Note that even though they used DPO, they also developed a reward m"
+"odel as you’d do in RLHF. Initially, they trained the reward model using a checkpoint from the pre-t"
+"raining phase, utilizing human-annotated data. This reward model was then used for the rejection sam"
+"pling process, helping to select appropriate prompts for further training.
+
+In each training round, "
+they applied model averaging techniques not only to the reward model but also to the SFT and DPO mod
+els. This averaging involved merging the parameters from recent and previous models to stabilize (an
+"d improve) performance over time.
+
+For those interested in the technical specifics of model averagin"
+"g, I discussed this topic in the section “Understanding Model Merging and Weight Averaging” of my ea"
+"rlier article Model Merging, Mixtures of Experts, and Towards Smaller LLMs.
+
+To sum it up, at the co"
+"re, it’s a relatively standard SFT + DPO stage. However, this stage is repeated over multiple rounds"
+". Then, they sprinkled in a reward model for rejection sampling (like Qwen 2 and AFM). They also use"
+"d model averaging like Gemma; however, it’s not just for the reward models but all models involved.
+"
+"
+Summary of techniques for Llama 3.1 post-training.
+4.4 Conclusion 
+The Llama 3 models remain fairly"
+" standard and similar to the earlier Llama 2 models but with some interesting approaches. Notably, t"
+"he large 15 trillion token training set distinguishes Llama 3 from other models. Interestingly, like"
+" Apple’s AFM model, Llama 3 also implemented a 3-stage pre-training process.
+
+In contrast to other r"
+"ecent large language models, Llama 3 did not employ knowledge distillation techniques, opting instea"
+"d for a more straightforward model development path. For post-training, the model utilized Direct Pr"
+eference Optimization (DPO) instead of the more complex reinforcement learning strategies that have 
+"been popular in other models. Overall, this choice is interesting as it indicates a focus on refinin"
+"g LLM performance through simpler (but proven) methods.
+
+5. Main Takeaways
+What can we learn from th"
+"ese four models discussed in this article: Alibaba’s Qwen 2, Apple’s foundational models (AFM), Goog"
+"le’s Gemma 2, and Meta’s Llama 3?
+
+All four models take somewhat different approaches to pre-trainin"
+"g and post-training. Of course, methodologies overlap, but no training pipeline is quite the same. F"
+"or pre-training, a shared feature seems to be that all methods use a multi-stage pre-training pipeli"
+"ne, where a general core pre-training is followed by a context lengthening and sometimes high-qualit"
+y annealing step. The figure below shows again the different methods employed in pre-training at a g
+"lance.
+
+Overview of the techniques used for pre-training
+When it comes to post-training, also none o"
+f the pipelines was exactly the same. It seems that rejection sampling is now a common staple in the
+" post-training process. However, when it comes to DPO or RLHF, there’s no consensus or preference (n"
+"o pun intended) yet.
+
+Overview of the techniques used for post-training
+So, in all, there is no sing"
+"le recipe but many paths to developing highly-performant LLMs.
+
+Lastly, the four models perform in t"
+"he same ballpark. Unfortunately, several of these models have not made it into the LMSYS and AlpacaE"
+"val leaderboards, so we have no direct comparison yet, except for the scores on multiple-choice benc"
+"hmarks like MMLU and others.
+
+"
