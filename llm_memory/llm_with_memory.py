@@ -87,7 +87,6 @@ class LLMWithMemory:
 
             # Check for early stopping condition
             if early_stopping and expected_output[0].equal(token_logits.argmax(dim=-1)[0]):
-                print(f"EARLY STOPPING - EPOCH {epoch}")
                 break
 
             # Compute loss and backpropagate
